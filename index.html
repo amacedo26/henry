@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Presupuesto mensual</title>
+<meta name="description" content="Planificá tus ingresos y gastos del mes de forma simple. Tus datos se guardan en tu dispositivo.">
+<style>
+  :root {
+    --surface-1: #fcfcfb;
+    --page: #f9f9f7;
+    --ink-1: #0b0b0b;
+    --ink-2: #52514e;
+    --ink-muted: #898781;
+    --grid: #e1e0d9;
+    --baseline: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --series-prev: #2a78d6;   /* previsto */
+    --series-real: #1baf7a;   /* real */
+    --good: #006300;
+    --bad: #d03b3b;
+    --good-bg: rgba(12, 163, 12, 0.10);
+    --bad-bg: rgba(208, 59, 59, 0.10);
+    --input-bg: #ffffff;
+    --shadow: 0 1px 3px rgba(11, 11, 11, 0.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --surface-1: #1a1a19;
+      --page: #0d0d0d;
+      --ink-1: #ffffff;
+      --ink-2: #c3c2b7;
+      --ink-muted: #898781;
+      --grid: #2c2c2a;
+      --baseline: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --series-prev: #3987e5;
+      --series-real: #199e70;
+      --good: #0ca30c;
+      --bad: #e66767;
+      --good-bg: rgba(12, 163, 12, 0.16);
+      --bad-bg: rgba(230, 103, 103, 0.14);
+      --input-bg: #242423;
+      --shadow: none;
+    }
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    background: var(--page);
+    color: var(--ink-1);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px 64px; }
+
+  /* ---------- Header ---------- */
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: var(--page);
+    border-bottom: 1px solid var(--grid);
+  }
+  .header-in {
+    max-width: 1080px; margin: 0 auto; padding: 14px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; flex: 1; }
+  .month-pick {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.875rem; color: var(--ink-2);
+  }
+  input[type="month"] {
+    font: inherit; color: var(--ink-1);
+    background: var(--input-bg);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .btn-ghost {
+    font: inherit; font-size: 0.8125rem; color: var(--ink-2);
+    background: none; border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 12px; cursor: pointer;
+  }
+  .btn-ghost:hover { color: var(--ink-1); background: var(--surface-1); }
+
+  .intro { padding: 28px 0 8px; }
+  .intro p { color: var(--ink-2); font-size: 0.9375rem; max-width: 56ch; }
+
+  /* ---------- Stat tiles ---------- */
+  .tiles {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    margin: 20px 0 28px;
+  }
+  @media (max-width: 820px) { .tiles { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 420px) { .tiles { grid-template-columns: 1fr; } }
+  .tile {
+    background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; box-shadow: var(--shadow);
+  }
+  .tile .label {
+    font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--ink-muted); margin-bottom: 6px;
+  }
+  .tile .value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; }
+  .tile .sub { font-size: 0.8125rem; color: var(--ink-2); margin-top: 4px; }
+  .tile .value.pos { color: var(--good); }
+  .tile .value.neg { color: var(--bad); }
+
+  /* ---------- Sections ---------- */
+  h2 {
+    font-size: 1rem; font-weight: 700; margin: 32px 0 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .section-hint { font-size: 0.875rem; color: var(--ink-2); margin-bottom: 14px; }
+
+  .cards { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 720px) { .cards { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+  .card-head {
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 18px 10px;
+  }
+  .card-head .emoji { font-size: 1.125rem; }
+  .card-head h3 { font-size: 0.9375rem; font-weight: 700; flex: 1; }
+
+  .table-scroll { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; min-width: 360px; }
+  thead th {
+    font-size: 0.6875rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--ink-muted); text-align: right;
+    padding: 4px 10px; border-bottom: 1px solid var(--grid);
+  }
+  thead th:first-child { text-align: left; padding-left: 18px; }
+  thead th:last-child { padding-right: 18px; }
+  tbody td { padding: 3px 10px; border-bottom: 1px solid var(--grid); }
+  tbody tr:last-child td { border-bottom: none; }
+  td.item-name { color: var(--ink-2); padding-left: 18px; }
+  td.num { text-align: right; white-space: nowrap; }
+  td.diff { text-align: right; font-variant-numeric: tabular-nums; padding-right: 18px; white-space: nowrap; }
+  .diff.pos { color: var(--good); }
+  .diff.neg { color: var(--bad); }
+
+  .money-input {
+    font: inherit; font-variant-numeric: tabular-nums;
+    color: var(--ink-1); background: var(--input-bg);
+    border: 1px solid transparent; border-radius: 6px;
+    padding: 5px 8px; width: 104px; text-align: right;
+  }
+  .money-input:hover { border-color: var(--border); }
+  .money-input:focus {
+    outline: none; border-color: var(--series-prev);
+    box-shadow: 0 0 0 2px rgba(42, 120, 214, 0.18);
+  }
+  .money-input::placeholder { color: var(--ink-muted); }
+  /* hide number spinners */
+  .money-input::-webkit-outer-spin-button,
+  .money-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .money-input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+  tfoot td {
+    padding: 10px; font-weight: 700; border-top: 1px solid var(--baseline);
+    background: color-mix(in srgb, var(--surface-1) 60%, var(--page));
+    font-variant-numeric: tabular-nums;
+  }
+  tfoot td:first-child { padding-left: 18px; }
+  tfoot td:last-child { padding-right: 18px; }
+  tfoot td.num, tfoot td.diff { text-align: right; }
+
+  .row-del {
+    border: none; background: none; cursor: pointer;
+    color: var(--ink-muted); font-size: 0.875rem; line-height: 1;
+    padding: 4px 6px; border-radius: 6px; visibility: hidden;
+  }
+  tbody tr:hover .row-del, .row-del:focus { visibility: visible; }
+  .row-del:hover { color: var(--bad); background: var(--bad-bg); }
+
+  .add-item {
+    display: block; width: 100%; text-align: left;
+    font: inherit; font-size: 0.8125rem; color: var(--ink-muted);
+    background: none; border: none; border-top: 1px dashed var(--grid);
+    padding: 10px 18px; cursor: pointer;
+  }
+  .add-item:hover { color: var(--series-prev); background: color-mix(in srgb, var(--surface-1) 60%, var(--page)); }
+
+  @media (max-width: 480px) {
+    .money-input { width: 76px; padding: 5px 6px; }
+    td.item-name, thead th:first-child, tfoot td:first-child { padding-left: 12px; }
+    td.diff, thead th:last-child, tfoot td:last-child { padding-right: 12px; }
+    .row-del { visibility: visible; }
+  }
+
+  /* ---------- Chart ---------- */
+  .chart-card {
+    background: var(--surface-1);
+    border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: var(--shadow); padding: 18px;
+  }
+  .chart-top { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chart-top h3 { font-size: 0.9375rem; font-weight: 700; flex: 1; }
+  .legend { display: flex; gap: 16px; font-size: 0.8125rem; color: var(--ink-2); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .swatch.prev { background: var(--series-prev); }
+  .swatch.real { background: var(--series-real); }
+
+  .chart-row { display: grid; grid-template-columns: 150px 1fr; gap: 0 12px; align-items: center; padding: 7px 0; }
+  @media (max-width: 560px) { .chart-row { grid-template-columns: 1fr; gap: 2px; } }
+  .chart-row + .chart-row { border-top: 1px solid var(--grid); }
+  .chart-label { font-size: 0.8125rem; color: var(--ink-2); text-align: right; }
+  @media (max-width: 560px) { .chart-label { text-align: left; font-weight: 600; } }
+  .bar-pair { display: flex; flex-direction: column; gap: 2px; }
+  .bar-line { display: flex; align-items: center; gap: 8px; min-height: 14px; }
+  .bar {
+    height: 12px; border-radius: 0 4px 4px 0;
+    min-width: 2px; transition: width 0.25s ease;
+  }
+  .bar.prev { background: var(--series-prev); }
+  .bar.real { background: var(--series-real); }
+  .bar-val { font-size: 0.75rem; color: var(--ink-2); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .chart-empty { color: var(--ink-muted); font-size: 0.875rem; padding: 24px 0; text-align: center; }
+
+  .tooltip {
+    position: fixed; z-index: 50; pointer-events: none;
+    background: var(--surface-1); color: var(--ink-1);
+    border: 1px solid var(--border); border-radius: 8px;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    padding: 8px 12px; font-size: 0.8125rem; display: none; max-width: 260px;
+  }
+  .tooltip b { display: block; margin-bottom: 2px; }
+  .tooltip .tt-row { display: flex; align-items: center; gap: 6px; color: var(--ink-2); }
+
+  footer {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--grid);
+    font-size: 0.8125rem; color: var(--ink-muted);
+  }
+
+  @media print {
+    header .btn-ghost, .add-item, .row-del { display: none; }
+    body { background: #fff; }
+    .card, .tile, .chart-card { box-shadow: none; break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-in">
+    <h1>💰 Presupuesto mensual</h1>
+    <label class="month-pick">Mes
+      <input type="month" id="month">
+    </label>
+    <button class="btn-ghost" id="reset" type="button">Restablecer</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="intro">
+    <p>Anotá lo que <strong>planeás</strong> ganar y gastar (previsto) y lo que <strong>realmente</strong> pasó (real).
+    La página calcula sola los totales, el saldo y en qué te pasaste. Todo se guarda en tu dispositivo.</p>
+  </div>
+
+  <!-- Resumen -->
+  <section class="tiles" id="tiles" aria-label="Resumen del mes"></section>
+
+  <!-- Ingresos -->
+  <h2>📥 Ingresos</h2>
+  <p class="section-hint">Sueldo, changas, alquileres que cobrás… todo lo que entra en el mes.</p>
+  <div class="card" id="income-card"></div>
+
+  <!-- Gráfico -->
+  <h2>📊 Previsto vs. real por categoría</h2>
+  <p class="section-hint">De un vistazo: dónde se va la plata y en qué categorías te pasaste del plan.</p>
+  <div class="chart-card">
+    <div class="chart-top">
+      <h3>Gastos del mes</h3>
+      <div class="legend" aria-hidden="true">
+        <span><i class="swatch prev"></i>Previsto</span>
+        <span><i class="swatch real"></i>Real</span>
+      </div>
+    </div>
+    <div id="chart"></div>
+  </div>
+
+  <!-- Gastos -->
+  <h2>📤 Gastos</h2>
+  <p class="section-hint">Completá solo lo que uses. Podés agregar ítems propios en cada categoría o borrar los que no necesites.</p>
+  <div class="cards" id="categories"></div>
+
+  <footer>
+    Tus datos se guardan únicamente en este navegador (no se envían a ningún servidor).
+    Usá «Restablecer» para volver a la plantilla original.
+  </footer>
+</div>
+
+<div class="tooltip" id="tooltip" role="presentation"></div>
+
+<script>
+"use strict";
+
+/* ---------- Plantilla (basada en la planilla original) ---------- */
+const TEMPLATE = {
+  month: "",
+  incomes: {
+    prev: [ { name: "Ingreso principal", v: 0 }, { name: "Ingresos adicionales", v: 0 } ],
+    real: [ { name: "Ingreso principal", v: 0 }, { name: "Ingresos adicionales", v: 0 } ]
+  },
+  categories: [
+    { id: "alojamiento", emoji: "🏠", name: "Alojamiento", items: [
+      "Hipoteca o alquiler", "Wifi", "Electricidad", "Gas", "Agua", "Streaming",
+      "Gastos comunes", "Mantenimiento o reparaciones", "Suministros", "Otros" ] },
+    { id: "transporte", emoji: "🚌", name: "Transporte", items: [
+      "Cuota del vehículo", "Taxi / Uber", "Boletos", "Seguro", "Licencias",
+      "Nafta / electricidad", "Mantenimiento", "Otros" ] },
+    { id: "comida", emoji: "🛒", name: "Comida", items: [
+      "Surtido", "Restaurantes", "Otros" ] },
+    { id: "seguro", emoji: "🛡️", name: "Seguros", items: [
+      "Hogar", "Salud", "Vida", "Otros" ] },
+    { id: "cuidado", emoji: "🧴", name: "Cuidado personal", items: [
+      "Médicos", "Cuidado personal", "Ropa", "Medicamentos", "Gimnasio", "Otros" ] },
+    { id: "mascotas", emoji: "🐾", name: "Mascotas", items: [
+      "Comida", "Médicos", "Limpieza", "Juguetes", "Otros" ] },
+    { id: "entretenimiento", emoji: "🎬", name: "Entretenimiento", items: [
+      "Salidas", "Cine y espectáculos", "Hobbies", "Otros" ] },
+    { id: "consorcio", emoji: "🏢", name: "Cuota consorcio", items: [
+      "Cuota mensual" ] },
+    { id: "impuestos", emoji: "🧾", name: "Impuestos", items: [
+      "IRPF / IASS", "BPS (si sos independiente)", "Impuestos municipales" ] },
+    { id: "ahorro", emoji: "🏦", name: "Ahorros e inversiones", items: [
+      "Ahorro mensual fijo (regla 10–20%)", "Fondo de emergencia",
+      "Dólares / moneda extranjera", "Inversiones (ETF, bonos, etc.)",
+      "Metas (viaje, casa, auto)" ] },
+    { id: "regalos", emoji: "🎁", name: "Regalos y donaciones", items: [
+      "Regalos", "Donaciones", "Otros" ] }
+  ]
+};
+
+const STORE_KEY = "presupuesto-mensual-v1";
+
+function freshState() {
+  return {
+    month: new Date().toISOString().slice(0, 7),
+    incomes: JSON.parse(JSON.stringify(TEMPLATE.incomes)),
+    categories: TEMPLATE.categories.map(c => ({
+      id: c.id, emoji: c.emoji, name: c.name,
+      items: c.items.map(n => ({ name: n, prev: 0, real: 0 }))
+    }))
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return freshState();
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.categories)) return freshState();
+    return s;
+  } catch { return freshState(); }
+}
+
+let state = loadState();
+let saveTimer = null;
+function save() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch {}
+  }, 250);
+}
+
+/* ---------- Formato ---------- */
+const fmt = new Intl.NumberFormat("es-UY", { style: "currency", currency: "UYU", maximumFractionDigits: 0 });
+const money = n => fmt.format(Math.round(n || 0));
+
+/* ---------- Cálculos ---------- */
+const sum = arr => arr.reduce((a, b) => a + (Number(b) || 0), 0);
+function catTotals(cat) {
+  return { prev: sum(cat.items.map(i => i.prev)), real: sum(cat.items.map(i => i.real)) };
+}
+function totals() {
+  const incPrev = sum(state.incomes.prev.map(i => i.v));
+  const incReal = sum(state.incomes.real.map(i => i.v));
+  let expPrev = 0, expReal = 0;
+  for (const c of state.categories) { const t = catTotals(c); expPrev += t.prev; expReal += t.real; }
+  return {
+    incPrev, incReal, expPrev, expReal,
+    saldoPrev: incPrev - expPrev,
+    saldoReal: incReal - expReal
+  };
+}
+
+/* ---------- Render: resumen ---------- */
+function renderTiles() {
+  const t = totals();
+  const diffGastos = t.expPrev - t.expReal; // + = gastaste menos de lo previsto
+  const el = document.getElementById("tiles");
+  el.innerHTML = "";
+  const tiles = [
+    { label: "Ingresos reales", value: money(t.incReal), sub: "Previsto: " + money(t.incPrev) },
+    { label: "Gastos reales", value: money(t.expReal), sub: "Previsto: " + money(t.expPrev) },
+    { label: "Saldo real", value: money(t.saldoReal), cls: t.saldoReal > 0 ? "pos" : (t.saldoReal < 0 ? "neg" : ""),
+      sub: "Saldo previsto: " + money(t.saldoPrev) },
+    { label: "Vs. lo planificado", value: (diffGastos >= 0 ? "" : "−") + money(Math.abs(diffGastos)),
+      cls: diffGastos > 0 ? "pos" : (diffGastos < 0 ? "neg" : ""),
+      sub: diffGastos > 0 ? "Gastaste menos de lo previsto 🎉"
+         : diffGastos < 0 ? "Te pasaste del plan"
+         : "Justo en el plan" }
+  ];
+  for (const d of tiles) {
+    const div = document.createElement("div");
+    div.className = "tile";
+    div.innerHTML = '<div class="label"></div><div class="value"></div><div class="sub"></div>';
+    div.querySelector(".label").textContent = d.label;
+    const v = div.querySelector(".value");
+    v.textContent = d.value;
+    if (d.cls) v.classList.add(d.cls);
+    div.querySelector(".sub").textContent = d.sub;
+    el.appendChild(div);
+  }
+}
+
+/* ---------- Render: ingresos ---------- */
+function moneyInput(value, onChange, ariaLabel) {
+  const inp = document.createElement("input");
+  inp.type = "number"; inp.min = "0"; inp.step = "any";
+  inp.className = "money-input"; inp.placeholder = "0";
+  inp.setAttribute("aria-label", ariaLabel);
+  if (value) inp.value = value;
+  inp.addEventListener("input", () => { onChange(Number(inp.value) || 0); refresh(); save(); });
+  return inp;
+}
+
+function renderIncome() {
+  const card = document.getElementById("income-card");
+  card.innerHTML = "";
+  const table = document.createElement("table");
+  table.innerHTML = "<thead><tr><th>Concepto</th><th>Previsto</th><th>Real</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  state.incomes.prev.forEach((row, i) => {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td"); name.className = "item-name"; name.textContent = row.name;
+    const tdP = document.createElement("td"); tdP.className = "num";
+    tdP.appendChild(moneyInput(row.v, v => { state.incomes.prev[i].v = v; }, row.name + " previsto"));
+    const tdR = document.createElement("td"); tdR.className = "num";
+    tdR.appendChild(moneyInput(state.incomes.real[i].v, v => { state.incomes.real[i].v = v; }, row.name + " real"));
+    tr.append(name, tdP, tdR);
+    tbody.appendChild(tr);
+  });
+  const tfoot = document.createElement("tfoot");
+  tfoot.innerHTML = '<tr><td>Total de ingresos</td><td class="num" data-inc-prev></td><td class="num" data-inc-real></td></tr>';
+  table.append(tbody, tfoot);
+  const scroll = document.createElement("div");
+  scroll.className = "table-scroll";
+  scroll.appendChild(table);
+  card.appendChild(scroll);
+}
+
+/* ---------- Render: categorías ---------- */
+function renderCategories() {
+  const wrap = document.getElementById("categories");
+  wrap.innerHTML = "";
+  state.categories.forEach((cat, ci) => {
+    const card = document.createElement("div");
+    card.className = "card";
+
+    const head = document.createElement("div");
+    head.className = "card-head";
+    head.innerHTML = '<span class="emoji"></span><h3></h3>';
+    head.querySelector(".emoji").textContent = cat.emoji;
+    head.querySelector("h3").textContent = cat.name;
+    card.appendChild(head);
+
+    const table = document.createElement("table");
+    table.innerHTML = "<thead><tr><th>Ítem</th><th>Previsto</th><th>Real</th><th>Diferencia</th><th></th></tr></thead>";
+    const tbody = document.createElement("tbody");
+
+    cat.items.forEach((item, ii) => {
+      const tr = document.createElement("tr");
+      const name = document.createElement("td"); name.className = "item-name"; name.textContent = item.name;
+      const tdP = document.createElement("td"); tdP.className = "num";
+      tdP.appendChild(moneyInput(item.prev, v => { item.prev = v; }, cat.name + " – " + item.name + " previsto"));
+      const tdR = document.createElement("td"); tdR.className = "num";
+      tdR.appendChild(moneyInput(item.real, v => { item.real = v; }, cat.name + " – " + item.name + " real"));
+      const tdD = document.createElement("td"); tdD.className = "diff"; tdD.dataset.diff = ci + ":" + ii;
+      const tdX = document.createElement("td");
+      const del = document.createElement("button");
+      del.className = "row-del"; del.type = "button"; del.textContent = "✕";
+      del.title = "Quitar ítem"; del.setAttribute("aria-label", "Quitar " + item.name);
+      del.addEventListener("click", () => {
+        cat.items.splice(ii, 1);
+        renderCategories(); refresh(); save();
+      });
+      tdX.appendChild(del);
+      tr.append(name, tdP, tdR, tdD, tdX);
+      tbody.appendChild(tr);
+    });
+
+    const tfoot = document.createElement("tfoot");
+    tfoot.innerHTML = '<tr><td>Total</td><td class="num" data-cat-prev="' + ci + '"></td>' +
+      '<td class="num" data-cat-real="' + ci + '"></td>' +
+      '<td class="diff" data-cat-diff="' + ci + '"></td><td></td></tr>';
+    table.append(tbody, tfoot);
+    const scroll = document.createElement("div");
+    scroll.className = "table-scroll";
+    scroll.appendChild(table);
+    card.appendChild(scroll);
+
+    const add = document.createElement("button");
+    add.className = "add-item"; add.type = "button"; add.textContent = "＋ Agregar ítem";
+    add.addEventListener("click", () => {
+      const n = prompt("Nombre del nuevo ítem:");
+      if (n && n.trim()) {
+        cat.items.push({ name: n.trim(), prev: 0, real: 0 });
+        renderCategories(); refresh(); save();
+      }
+    });
+    card.appendChild(add);
+
+    wrap.appendChild(card);
+  });
+}
+
+/* ---------- Render: gráfico ---------- */
+const tooltip = document.getElementById("tooltip");
+function showTip(e, html) {
+  tooltip.innerHTML = html;
+  tooltip.style.display = "block";
+  const pad = 12;
+  let x = e.clientX + pad, y = e.clientY + pad;
+  const r = tooltip.getBoundingClientRect();
+  if (x + r.width > window.innerWidth - 8) x = e.clientX - r.width - pad;
+  if (y + r.height > window.innerHeight - 8) y = e.clientY - r.height - pad;
+  tooltip.style.left = x + "px"; tooltip.style.top = y + "px";
+}
+function hideTip() { tooltip.style.display = "none"; }
+
+function renderChart() {
+  const el = document.getElementById("chart");
+  el.innerHTML = "";
+  const rows = state.categories
+    .map(c => ({ name: c.name, emoji: c.emoji, ...catTotals(c) }))
+    .filter(r => r.prev > 0 || r.real > 0)
+    .sort((a, b) => (b.real || b.prev) - (a.real || a.prev));
+
+  if (!rows.length) {
+    el.innerHTML = '<div class="chart-empty">Ingresá tus gastos abajo y acá vas a ver la comparación por categoría.</div>';
+    return;
+  }
+  const max = Math.max(...rows.map(r => Math.max(r.prev, r.real)));
+
+  for (const r of rows) {
+    const row = document.createElement("div");
+    row.className = "chart-row";
+    const label = document.createElement("div");
+    label.className = "chart-label"; label.textContent = r.name;
+    const pair = document.createElement("div");
+    pair.className = "bar-pair";
+
+    for (const [key, cls, serie] of [["prev", "prev", "Previsto"], ["real", "real", "Real"]]) {
+      const line = document.createElement("div");
+      line.className = "bar-line";
+      const bar = document.createElement("div");
+      bar.className = "bar " + cls;
+      bar.style.width = Math.max(0.5, (r[key] / max) * 100) + "%";
+      const val = document.createElement("span");
+      val.className = "bar-val"; val.textContent = money(r[key]);
+      const tip = ev => showTip(ev,
+        "<b>" + r.emoji + " " + r.name + "</b>" +
+        '<div class="tt-row"><i class="swatch ' + cls + '"></i>' + serie + ": <strong>" + money(r[key]) + "</strong></div>" +
+        '<div class="tt-row">Diferencia: ' + money(r.prev - r.real) + "</div>");
+      line.addEventListener("mousemove", tip);
+      line.addEventListener("mouseleave", hideTip);
+      line.append(bar, val);
+      pair.appendChild(line);
+    }
+    row.append(label, pair);
+    el.appendChild(row);
+  }
+}
+
+/* ---------- Refresh de valores calculados (sin re-render de inputs) ---------- */
+function refresh() {
+  const t = totals();
+  const set = (sel, val) => { const n = document.querySelector(sel); if (n) n.textContent = val; };
+  set("[data-inc-prev]", money(t.incPrev));
+  set("[data-inc-real]", money(t.incReal));
+
+  state.categories.forEach((cat, ci) => {
+    const ct = catTotals(cat);
+    set('[data-cat-prev="' + ci + '"]', money(ct.prev));
+    set('[data-cat-real="' + ci + '"]', money(ct.real));
+    const dEl = document.querySelector('[data-cat-diff="' + ci + '"]');
+    if (dEl) applyDiff(dEl, ct.prev - ct.real);
+    cat.items.forEach((item, ii) => {
+      const cell = document.querySelector('[data-diff="' + ci + ":" + ii + '"]');
+      if (cell) applyDiff(cell, item.prev - item.real);
+    });
+  });
+
+  renderTiles();
+  renderChart();
+}
+
+/* Diferencia = previsto − real. Positiva: gastaste menos (bien). Negativa: te pasaste. */
+function applyDiff(el, d) {
+  el.classList.remove("pos", "neg");
+  if (!d) { el.textContent = "—"; return; }
+  el.textContent = (d > 0 ? "+" : "−") + money(Math.abs(d));
+  el.classList.add(d > 0 ? "pos" : "neg");
+}
+
+/* ---------- Controles globales ---------- */
+const monthInput = document.getElementById("month");
+monthInput.value = state.month || new Date().toISOString().slice(0, 7);
+monthInput.addEventListener("change", () => { state.month = monthInput.value; save(); });
+
+document.getElementById("reset").addEventListener("click", () => {
+  if (confirm("¿Borrar todos los montos y volver a la plantilla original?")) {
+    localStorage.removeItem(STORE_KEY);
+    state = freshState();
+    monthInput.value = state.month;
+    renderIncome(); renderCategories(); refresh();
+  }
+});
+
+/* ---------- Init ---------- */
+renderIncome();
+renderCategories();
+refresh();
+</script>
+</body>
+</html>
